@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="EUDR plot-data remediation. We repair supplier geolocation files, screen them against the 2020 forest baseline, and hand back something you can file.">
+<meta property="og:title" content="SignalPoint. Every plot, proven.">
+<meta property="og:description" content="EUDR wants the coordinates of every plot behind every consignment. We make yours filable.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://eudr.signalpoint.in/">
+<link rel="canonical" href="https://eudr.signalpoint.in/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M2.5 14.8 L6.2 4.4 L14.4 2.2 L19.5 8.6 L15.6 19.6 L6.1 18.3 Z' stroke='%2310A568' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='11' cy='10.6' r='2.7' fill='%2310A568'/%3E%3C/svg%3E">
+<title>SignalPoint. EUDR plot data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+<style>
+  html{-webkit-text-size-adjust:100%} body{margin:0} img,svg{max-width:100%} [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<style>
+  :root{
+    --forest:#067A4E; --forest-mid:#04633E; --canopy:#10A568; --leaf:#14B87A;
+    --tint:#E2F5EB;
+    --accent:#C2560A; --accent-soft:#FDF0E3;
+    --invert:#04371F; --on-invert:#FFFFFF;
+
+    --ground:#FFFFFF; --ground-2:#F3F8F5;
+    --ink:#0C1711; --ink-2:#35453C; --muted:#526158;
+    --line:#D3E0D8; --line-strong:#7C9285;
+
+    --critical:#B42318; --critical-tint:#FDE9E5;
+    --caution:#8A6908; --caution-tint:#FBF3DA;
+    --clear:#067A4E; --clear-tint:#DFF4E9;
+
+    --fs-xs:.75rem; --fs-sm:.875rem; --fs-base:1rem; --fs-md:1.125rem;
+    --fs-lg:1.375rem; --fs-xl:1.875rem; --fs-2xl:2.5rem; --fs-3xl:3.5rem;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
+
+    --serif:"Source Serif 4",Georgia,serif;
+    --sans:"Libre Franklin",system-ui,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    --gut:clamp(20px,4vw,56px); --nav-h:62px;
+    --sec:clamp(72px,9vw,128px);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --forest:#3DD68C; --forest-mid:#63E3A8; --canopy:#2CC97F; --leaf:#14B87A;
+      --tint:#082A1B;
+      --accent:#FDA13B; --accent-soft:#2A1A08;
+      --invert:#04150D; --on-invert:#FFFFFF;
+      --ground:#080D0A; --ground-2:#101811;
+      --ink:#E8F2EC; --ink-2:#ADBFB4; --muted:#8B9E92;
+      --line:#1E2A22; --line-strong:#5A6E62;
+      --critical:#F0917C; --critical-tint:#2A1310;
+      --caution:#DCB45E; --caution-tint:#251E0C;
+      --clear:#4ADE9B; --clear-tint:#07271A;
+    }
+  }
+  :root[data-theme="dark"]{
+    --forest:#3DD68C; --forest-mid:#63E3A8; --canopy:#2CC97F; --leaf:#14B87A;
+    --tint:#082A1B; --accent:#FDA13B; --accent-soft:#2A1A08;
+    --invert:#04150D; --on-invert:#FFFFFF;
+    --ground:#080D0A; --ground-2:#101811;
+    --ink:#E8F2EC; --ink-2:#ADBFB4; --muted:#8B9E92;
+    --line:#1E2A22; --line-strong:#5A6E62;
+    --critical:#F0917C; --critical-tint:#2A1310;
+    --caution:#DCB45E; --caution-tint:#251E0C;
+    --clear:#4ADE9B; --clear-tint:#07271A;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  [id]{scroll-margin-top:calc(var(--nav-h) + var(--s4))}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+       font-variant-numeric:tabular-nums;
+       font-size:var(--fs-base);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .shell{max-width:1140px;margin:0 auto;padding-inline:var(--gut)}
+  a{color:var(--forest)}
+  h1,h2,h3{margin:0;font-family:var(--serif);letter-spacing:-.022em;text-wrap:balance}
+  h1{font-weight:700;line-height:1.04}
+  h2{font-weight:700;line-height:1.1;letter-spacing:-.018em}
+  h3{font-weight:600;line-height:1.24;letter-spacing:-.008em}
+  h1{font-size:clamp(var(--fs-2xl),4.6vw,var(--fs-3xl))}
+  h2{font-size:clamp(var(--fs-xl),2.8vw,var(--fs-2xl))}
+  h3{font-size:var(--fs-md)}
+  p{margin:0}
+  .label{font-size:var(--fs-xs);font-weight:600;letter-spacing:.16em;
+         text-transform:uppercase;color:var(--muted)}
+  .lede{font-size:var(--fs-md);color:var(--ink-2)}
+  .note{font-size:var(--fs-sm);color:var(--muted)}
+  .rule{width:48px;height:3px;background:var(--accent);margin-bottom:var(--s5)}
+
+  /* nav */
+  .nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:60;background:var(--ground);
+       border-bottom:1px solid var(--line)}
+  .nav .in{min-height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s5)}
+  .logo{display:flex;align-items:center;gap:var(--s2);font-weight:700;font-size:var(--fs-md);
+        letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+  .logo svg{color:var(--canopy);display:block}
+  .logo .tag{font-weight:500;font-size:var(--fs-xs);letter-spacing:.14em;text-transform:uppercase;
+             color:var(--muted);border-left:1px solid var(--line);padding-left:var(--s2)}
+  .links{display:flex;gap:var(--s6)}
+  .links a{text-decoration:none;color:var(--ink-2);font-size:var(--fs-sm);font-weight:500;
+           padding-block:var(--s2);border-bottom:2px solid transparent;transition:.15s}
+  .links a:hover{color:var(--ink);border-bottom-color:var(--accent)}
+  .menu{display:none}
+  .menu summary{list-style:none;cursor:pointer;border:1px solid var(--line-strong);
+                padding:var(--s2) var(--s3);font-size:var(--fs-sm);font-weight:600;color:var(--ink)}
+  .menu summary::-webkit-details-marker{display:none}
+  .menu-p{display:none;position:absolute;left:0;right:0;background:var(--ground);
+          border-bottom:1px solid var(--line);padding:var(--s3) var(--gut) var(--s5)}
+  .menu[open] .menu-p{display:block}
+  .menu-p a{display:block;padding-block:var(--s3);border-bottom:1px solid var(--line);
+            text-decoration:none;color:var(--ink);font-weight:500}
+  @media(max-width:900px){.links{display:none}.menu{display:block}}
+
+  .btn{display:inline-block;font-size:var(--fs-sm);font-weight:600;padding:var(--s3) var(--s5);
+       border:1px solid var(--forest);background:var(--forest);color:var(--ground);
+       text-decoration:none;cursor:pointer;border-radius:0;transition:.16s}
+  .btn:hover{background:var(--forest-mid);border-color:var(--forest-mid)}
+  .btn:active{transform:translateY(1px)}
+  .btn.o{background:transparent;color:var(--forest)}
+  .btn.o:hover{background:var(--tint);border-color:var(--forest)}
+  .btn.sm{padding:var(--s2) var(--s4)}
+  a:focus-visible,button:focus-visible,summary:focus-visible,textarea:focus-visible,
+  .finds:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px}
+
+  .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+         gap:clamp(var(--s6),4vw,var(--s7));align-items:center}
+  .split.lead{grid-template-columns:minmax(0,6fr) minmax(0,5fr);align-items:start}
+  @media(max-width:900px){.split,.split.lead{grid-template-columns:1fr;gap:var(--s6)}}
+
+  section{padding-block:var(--sec);border-bottom:1px solid var(--line)}
+  section.tinted{background:var(--ground-2)}
+  .head{margin-bottom:var(--s6);max-width:60ch}
+  .head .num{font-family:var(--mono);font-size:var(--fs-sm);color:var(--accent);margin-bottom:var(--s2)}
+  .head p{margin-top:var(--s3);color:var(--ink-2)}
+
+  figure{margin:0}
+  figure svg{width:100%;height:auto;display:block;max-width:100%}
+  figcaption{margin-top:var(--s3);font-size:var(--fs-sm);color:var(--muted);line-height:1.55}
+  .plate{border:1px solid var(--line-strong);box-shadow:0 1px 0 var(--line)}
+  .framed{background:var(--ground-2);padding:clamp(var(--s5),3vw,var(--s6));
+          border-left:3px solid var(--canopy)}
+  /* wide flow diagrams: never let type fall below ~10px, scroll the figure instead */
+  .wide{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* scroll rather than shrink: 1:1 keeps every label at its authored size */
+  .wide.w760 svg{min-width:760px}
+  .wide.w900 svg{min-width:900px}
+  .scrollhint{display:none;font-size:var(--fs-xs);color:var(--muted);margin-top:var(--s2)}
+  @media(max-width:820px){.scrollhint{display:block}}
+
+  .mesh{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+  .mesh.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mesh.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .mesh>*{background:var(--ground);padding:var(--s5)}
+  @media(max-width:900px){.mesh.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:640px){.mesh.two,.mesh.four{grid-template-columns:1fr}}
+
+  .stat .n{font-family:var(--serif);font-size:var(--fs-2xl);font-weight:700;line-height:1;
+           letter-spacing:-.02em;color:var(--forest);display:block;margin-bottom:var(--s2)}
+  .stat .t{font-size:var(--fs-sm);color:var(--ink-2)}
+
+  .svc .i{font-family:var(--mono);font-size:var(--fs-xs);color:var(--accent);margin-bottom:var(--s2)}
+  .svc h3{margin-bottom:var(--s2)}
+  .svc p{font-size:var(--fs-sm);color:var(--ink-2)}
+  .svc b{display:block;margin-top:var(--s3);font-family:var(--mono);font-size:var(--fs-xs);
+         font-weight:500;color:var(--forest)}
+
+  /* diagnostic */
+  .diag{border:1px solid var(--line);background:var(--ground)}
+  .diag-h{display:flex;justify-content:space-between;align-items:center;gap:var(--s4);
+          padding:var(--s3) var(--s5);background:var(--invert);color:var(--on-invert);flex-wrap:wrap}
+  .diag-h .label{color:inherit;opacity:.8}
+  .diag-h .st{font-family:var(--mono);font-size:var(--fs-xs);opacity:.85}
+  .diag-b{display:grid;grid-template-columns:1fr 1fr}
+  @media(max-width:860px){.diag-b{grid-template-columns:1fr}}
+  .pane{padding:var(--s5)}
+  .pane+.pane{border-left:1px solid var(--line)}
+  @media(max-width:860px){.pane+.pane{border-left:0;border-top:1px solid var(--line)}}
+  textarea{width:100%;min-height:220px;resize:vertical;display:block;font-family:var(--mono);
+           font-size:var(--fs-xs);line-height:1.7;padding:var(--s3);
+           border:1px solid var(--line-strong);border-radius:0;background:var(--ground-2);color:var(--ink)}
+  .acts{display:flex;gap:var(--s3);margin-top:var(--s3);flex-wrap:wrap;align-items:center}
+  .lnk{background:none;border:0;padding:0;font:inherit;font-size:var(--fs-sm);
+       color:var(--forest);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .lnk:hover{color:var(--forest-mid)}
+  .svc{transition:background .18s}
+  .svc:hover{background:var(--tint)}
+  figcaption strong{color:var(--ink)}
+  p a{text-underline-offset:2px;text-decoration-thickness:1px}
+  p a:hover{color:var(--forest-mid)}
+  .verdict{border:1px solid var(--line);border-left-width:3px;padding:var(--s4);
+           background:var(--ground-2);margin-bottom:var(--s3)}
+  .verdict.bad{border-left-color:var(--critical);background:var(--critical-tint)}
+  .verdict.good{border-left-color:var(--clear);background:var(--clear-tint)}
+  .verdict .b{font-family:var(--serif);font-size:var(--fs-lg);font-weight:600;line-height:1.24;margin-bottom:var(--s1)}
+  .verdict .s{font-size:var(--fs-sm);color:var(--ink-2)}
+  .tally{display:flex;gap:var(--s2);flex-wrap:wrap;margin-bottom:var(--s3)}
+  .pill{font-family:var(--mono);font-size:var(--fs-xs);padding:var(--s1) var(--s3);border:1px solid var(--line-strong)}
+  .pill.f{background:var(--critical-tint);border-color:var(--critical);color:var(--critical)}
+  .pill.w{background:var(--caution-tint);border-color:var(--caution);color:var(--caution)}
+  .pill.p{background:var(--clear-tint);border-color:var(--clear);color:var(--clear)}
+  .finds{max-height:270px;overflow-y:auto;border:1px solid var(--line)}
+  .find{padding:var(--s3);border-bottom:1px solid var(--line);font-size:var(--fs-sm);
+        display:flex;gap:var(--s3);align-items:flex-start}
+  .find:last-child{border-bottom:0}
+  .find .sev{font-family:var(--mono);font-size:var(--fs-xs);padding:0 var(--s1);flex:none;margin-top:3px}
+  .sev.FAIL{background:var(--critical-tint);color:var(--critical)}
+  .sev.WARN{background:var(--caution-tint);color:var(--caution)}
+  .find .id{font-family:var(--mono);color:var(--muted);font-size:var(--fs-xs)}
+  .empty{padding:var(--s6) var(--s4);color:var(--muted);font-size:var(--fs-sm);text-align:center}
+
+  .cta{background:var(--invert);color:var(--on-invert);border-bottom:0}
+  .cta h2{color:var(--on-invert);margin-bottom:var(--s4)}
+  .cta p{color:color-mix(in srgb,var(--on-invert) 84%,transparent)}
+  .cta .label{color:color-mix(in srgb,var(--on-invert) 64%,transparent)}
+  .cta .rule{background:var(--accent)}
+  .cta .btn{background:var(--on-invert);border-color:var(--on-invert);color:var(--invert)}
+  .cta a.m{color:var(--on-invert);font-family:var(--mono);font-size:var(--fs-sm);word-break:break-all}
+  .box{border:1px solid color-mix(in srgb,var(--on-invert) 30%,transparent);padding:var(--s5)}
+  .box .r{display:flex;justify-content:space-between;gap:var(--s4);padding-block:var(--s2);
+          border-bottom:1px solid color-mix(in srgb,var(--on-invert) 18%,transparent)}
+  .box .r:last-of-type{border-bottom:0}
+  .box dt{font-size:var(--fs-sm);color:color-mix(in srgb,var(--on-invert) 74%,transparent)}
+  .box dd{margin:0;font-family:var(--mono);font-size:var(--fs-xs);color:var(--on-invert)}
+
+  footer{background:var(--ground-2);padding-block:var(--s6) var(--s7)}
+  footer p{font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:var(--s2)}
+  footer .src{font-size:var(--fs-xs);line-height:1.8;color:var(--muted);
+              border-top:1px solid var(--line);padding-top:var(--s4);margin-top:var(--s4)}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
+
+<header class="nav">
+  <div class="shell in">
+    <a class="logo" href="#top">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+        <path d="M2.5 14.8 L6.2 4.4 L14.4 2.2 L19.5 8.6 L15.6 19.6 L6.1 18.3 Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none" opacity=".45"/>
+        <circle cx="11" cy="10.6" r="2.7" fill="currentColor"/>
+      </svg>
+      SignalPoint<span class="tag">EUDR</span>
+    </a>
+    <nav class="links" aria-label="Primary">
+      <a href="#work">How it works</a>
+      <a href="#rule">The 4 ha rule</a>
+      <a href="#who">Who needs it</a>
+      <a href="#check">Diagnostic</a>
+      <a href="#terms">Data</a>
+    </nav>
+    <details class="menu">
+      <summary aria-label="Open navigation">Menu</summary>
+      <div class="menu-p">
+        <a href="#work">How it works</a><a href="#rule">The 4 ha rule</a>
+        <a href="#who">Who needs it</a><a href="#check">Diagnostic</a><a href="#terms">Data</a>
+      </div>
+    </details>
+    <a class="btn sm" href="#cta">Request a quote</a>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="split lead shell" style="border-bottom:1px solid var(--line);padding-block:clamp(var(--s7),6vw,var(--s8))">
+  <div>
+    <div class="rule"></div>
+    <h1>Every plot, proven.</h1>
+    <p class="lede" style="margin-top:var(--s4)">
+      EUDR wants the coordinates of every plot behind every consignment. What suppliers
+      actually send is a spreadsheet with gaps in it. We repair that file, screen it against the
+      2020 forest baseline, and hand back something you can file.
+    </p>
+    <div style="display:flex;gap:var(--s3);flex-wrap:wrap;margin-top:var(--s5)">
+      <a class="btn" href="#check">Check your file free</a>
+      <a class="btn o" href="#cta">Request a quote</a>
+    </div>
+  </div>
+
+  <figure>
+    <svg class="plate" viewBox="-36 0 516 382" role="img"
+         aria-label="Parcel plan of three adjoining smallholder plots with six-decimal coordinate ticks. Two are under four hectares; one is 7.4 hectares and part of it was cleared after the 2020 cut-off.">
+      <defs>
+        <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="7" stroke="#C2560A" stroke-width="2.5"/>
+        </pattern>
+      </defs>
+
+      <rect x="-36" y="0" width="516" height="382" fill="#F7F6EF"/>
+      <g stroke="#D8D5C9" stroke-width=".75">
+        <path d="M132,30 V286 M212,30 V286 M292,30 V286 M372,30 V286"/>
+        <path d="M52,94 H452 M52,158 H452 M52,222 H452"/>
+      </g>
+      <rect x="52" y="30" width="400" height="256" fill="none" stroke="#9A9686" stroke-width="1.5"/>
+
+      <!-- parcels drawn to one scale: 2550 square units per hectare -->
+      <g stroke-width="1.75" fill-opacity=".34">
+        <polygon points="58,74 150,62 176,96 168,140 96,150 60,120" fill="#5FC79A" stroke="#067A4E"/>
+        <polygon points="176,96 262,80 292,128 276,172 190,186 168,140" fill="#5FC79A" stroke="#067A4E"/>
+        <polygon points="292,128 408,110 440,178 424,250 318,262 276,172" fill="#F2B559" stroke="#B26A07"/>
+      </g>
+
+      <polygon points="340,96 436,86 448,152 352,166" fill="url(#hatch)" fill-opacity=".85"
+               stroke="#C2560A" stroke-width="2.5" stroke-dasharray="6 3"/>
+
+      <g font-family="IBM Plex Mono, monospace" font-size="10.5" font-weight="500">
+        <text x="72" y="104" fill="#0C1711">PLOT-014</text>
+        <text x="72" y="118" fill="#35453C" font-weight="400">3.2 ha</text>
+        <text x="196" y="136" fill="#0C1711">PLOT-022</text>
+        <text x="196" y="150" fill="#35453C" font-weight="400">3.8 ha</text>
+        <text x="318" y="204" fill="#6E4406">PLOT-019</text>
+        <text x="318" y="218" fill="#6E4406" font-weight="400">7.4 ha</text>
+      </g>
+
+      <!-- axes: longitude runs east-west on X, latitude north-south on Y -->
+      <g font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#6B6A5F">
+        <text x="52" y="22" text-anchor="middle">38.471200</text>
+        <text x="212" y="22" text-anchor="middle">38.474100</text>
+        <text x="372" y="22" text-anchor="middle">38.477000</text>
+        <text x="46" y="34" text-anchor="end">6.756900</text>
+        <text x="46" y="98" text-anchor="end">6.755000</text>
+        <text x="46" y="162" text-anchor="end">6.753100</text>
+        <text x="46" y="226" text-anchor="end">6.751200</text>
+        <text x="266" y="308" text-anchor="middle" fill="#9A9686">longitude →</text>
+      </g>
+
+      <g stroke="#35453C" stroke-width="1.5">
+        <path d="M52,302 H132"/><path d="M52,298 V306 M92,298 V306 M132,298 V306"/>
+      </g>
+      <text x="140" y="306" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#35453C">200 m</text>
+      <text x="452" y="306" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#6B6A5F"
+            text-anchor="end">EPSG:4326 · 6 dp</text>
+
+      <!-- legend carries the semantics, so labels inside the parcels stay short -->
+      <g font-family="Libre Franklin, sans-serif" font-size="10">
+        <rect x="52" y="322" width="14" height="11" fill="#5FC79A" fill-opacity=".34" stroke="#067A4E" stroke-width="1.5"/>
+        <text x="72" y="331" fill="#35453C">4 ha or under: a point is accepted</text>
+        <rect x="52" y="340" width="14" height="11" fill="#F2B559" fill-opacity=".34" stroke="#B26A07" stroke-width="1.5"/>
+        <text x="72" y="349" fill="#35453C">above 4 ha: a boundary polygon is required</text>
+        <rect x="52" y="358" width="14" height="11" fill="url(#hatch)" fill-opacity=".85" stroke="#C2560A" stroke-width="1.5"/>
+        <text x="72" y="367" fill="#C2560A">cleared after 31 Dec 2020</text>
+      </g>
+    </svg>
+    <figcaption>
+      Illustrative parcel plan. It is drawn, not photographed. Drawn to a single scale of 2,550 square units
+      per hectare, so the areas are true. PLOT-019 exceeds four hectares, needs a boundary rather
+      than a point, and part of it was cleared after the cut-off.
+    </figcaption>
+  </figure>
+</section>
+
+<section class="tinted" style="padding-block:0">
+  <div class="shell">
+    <div class="mesh four" style="border-left:0;border-right:0">
+      <div class="stat"><span class="n">30 Dec</span><span class="t">2026. The date medium and large operators must comply</span></div>
+      <div class="stat"><span class="n">≥ 4%</span><span class="t">of EU turnover. Article 25 sets this as the floor on maximum fines</span></div>
+      <div class="stat"><span class="n">~64M</span><span class="t">plots industry-wide still to be mapped and declared</span></div>
+      <div class="stat"><span class="n">6 dp</span><span class="t">coordinate precision required, in EPSG:4326</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="work">
+  <div class="shell">
+    <div class="head">
+      <div class="num">01</div>
+      <h2>How it works</h2>
+      <p>Ten vendors will sell you software. All of them leave the data work to you, and that work is the whole of our practice.</p>
+    </div>
+
+    <figure class="framed wide w760">
+      <svg viewBox="0 0 760 244" role="img"
+           aria-label="Flow: every supplier file is ingested, validated, screened against the 2020 baseline and reviewed by hand into a filing pack, while plots that cannot be fixed loop back to the supplier as a written request.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#C2560A"/>
+          </marker>
+        </defs>
+        <g font-family="Libre Franklin, sans-serif" fill="currentColor">
+          <text x="10" y="44" font-size="10.5" font-weight="700" letter-spacing="1" opacity=".7">SUPPLIERS</text>
+          <g stroke="currentColor" stroke-width="1.5" fill="none" opacity=".55">
+            <rect x="10" y="56" width="136" height="26"/>
+            <rect x="10" y="90" width="136" height="26"/>
+            <rect x="10" y="124" width="136" height="26"/>
+          </g>
+          <g font-size="10.5" opacity=".9">
+            <text x="20" y="73">Excel, co-op A</text>
+            <text x="20" y="107">KML, exporter B</text>
+            <text x="20" y="141">photos, messages</text>
+          </g>
+
+          <path d="M146,69 H160 M146,103 H160 M146,137 H160 M160,69 V137" fill="none"
+                stroke="currentColor" stroke-width="1.5" opacity=".7"/>
+          <line x1="160" y1="103" x2="172" y2="103" stroke="currentColor" stroke-width="1.75" marker-end="url(#ar)"/>
+
+          <g stroke="currentColor" stroke-width="1.5" fill="none">
+            <rect x="178" y="74" width="140" height="58"/>
+            <rect x="336" y="74" width="134" height="58"/>
+            <rect x="490" y="74" width="134" height="58"/>
+          </g>
+          <g font-size="12.5" font-weight="600">
+            <text x="192" y="99">Validate</text><text x="350" y="99">Screen</text><text x="504" y="99">Review</text>
+          </g>
+          <g font-size="10.5" opacity=".72">
+            <text x="192" y="115">range, precision</text><text x="192" y="128">geometry</text>
+            <text x="350" y="115">against the</text><text x="350" y="128">2020 baseline</text>
+            <text x="504" y="115">every flag read</text><text x="504" y="128">by a person</text>
+          </g>
+
+          <g stroke="currentColor" stroke-width="1.75" fill="none" marker-end="url(#ar)">
+            <line x1="318" y1="103" x2="330" y2="103"/>
+            <line x1="468" y1="103" x2="484" y2="103"/>
+            <line x1="624" y1="103" x2="640" y2="103"/>
+          </g>
+
+          <rect x="646" y="70" width="108" height="66" fill="#067A4E"/>
+          <text x="658" y="94" fill="#FFFFFF" font-size="12.5" font-weight="600">Filing pack</text>
+          <text x="658" y="110" fill="#DFF4E9" font-size="10">GeoJSON</text>
+          <text x="658" y="124" fill="#DFF4E9" font-size="10">evidence</text>
+
+          <path d="M240,132 V186 H75 V152" fill="none" stroke="#C2560A" stroke-width="2.75"
+                stroke-dasharray="7 4" marker-end="url(#arA)"/>
+          <text x="258" y="182" fill="#C2560A" font-size="10.5" font-weight="600">what we cannot fix →</text>
+          <text x="258" y="196" fill="#C2560A" font-size="10.5">a written request to that supplier</text>
+        </g>
+      </svg>
+      <figcaption>
+        That dashed line back to the supplier is the bit no platform handles for you. Plots usually
+        fail because nobody ever recorded the coordinate. Chasing that needs a specific question sent
+        to a specific person, which is slow, and it is most of the work.
+      </figcaption>
+      <p class="scrollhint">Scroll the diagram sideways to see the full flow.</p>
+    </figure>
+
+    <div class="mesh two" style="margin-top:var(--s6)">
+      <div class="svc"><div class="i">S/01</div><h3>Plot data remediation</h3>
+        <p>We check the coordinate range, the precision and the projection. Then the faults that hide: axes entered the wrong way round, nulls logged as 0,0, one plot recorded twice by two collectors. Polygons get their rings closed and their winding order corrected.</p>
+        <b>plots.geojson</b></div>
+      <div class="svc"><div class="i">S/02</div><h3>Supplier exception management</h3>
+        <p>The plots your data cannot fix, grouped by supplier, each with the request that recovers them, drafted and ready to send.</p>
+        <b>exceptions.xlsx</b></div>
+      <div class="svc"><div class="i">S/03</div><h3>Screening and human review</h3>
+        <p>Plot-level screening on the 2020 cut-off using FAO Whisp with Sentinel and Landsat. A person reads every flag, because dense agroforestry looks like forest to a classifier.</p>
+        <b>screening.pdf</b></div>
+      <div class="svc"><div class="i">S/04</div><h3>Evidence and method</h3>
+        <p>Datasets, versions and decision rules, written so a competent authority can follow the work on its own. We also write down what we could not check.</p>
+        <b>method.pdf</b></div>
+    </div>
+  </div>
+</section>
+
+<section id="rule" class="tinted">
+  <div class="shell split">
+    <div>
+      <div class="head" style="margin-bottom:0">
+        <div class="num">02</div>
+        <h2>Four hectares changes everything</h2>
+        <p>
+          Up to four hectares, one coordinate pair does the job. Past that the regulation wants the
+          whole boundary. Getting this wrong is expensive precisely because you only find out late,
+          and by then somebody has to walk the plot again.
+        </p>
+        <p class="note" style="margin-top:var(--s4)">
+          It is also the fault our diagnostic turns up most often, usually in files that look
+          complete at a glance.
+        </p>
+      </div>
+    </div>
+    <figure>
+      <svg viewBox="0 0 460 236" role="img"
+           aria-label="One 7.4 hectare plot declared two ways: as a single coordinate pair, which is rejected above four hectares, and as a boundary polygon, which is accepted. The geometry is identical in both panels.">
+        <defs>
+          <polygon id="parcel" points="0,0 104,-10 146,26 136,84 48,98 6,54"/>
+        </defs>
+        <g font-family="Libre Franklin, sans-serif">
+          <text x="14" y="20" font-size="10.5" font-weight="700" fill="#C2560A" letter-spacing=".5">DECLARED AS A POINT</text>
+          <use href="#parcel" transform="translate(20,52)" fill="var(--critical-tint)"
+               stroke="var(--critical)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <circle cx="93" cy="97" r="5.5" fill="var(--critical)"/>
+          <text x="14" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".78">6.752341, 38.471902</text>
+          <text x="14" y="204" font-size="10.5" font-weight="600" fill="var(--critical)">Rejected above 4 ha</text>
+
+          <line x1="230" y1="44" x2="230" y2="196" stroke="currentColor" stroke-width="1.5" opacity=".22"/>
+
+          <text x="260" y="20" font-size="10.5" font-weight="700" fill="#067A4E" letter-spacing=".5">DECLARED AS A POLYGON</text>
+          <use href="#parcel" transform="translate(266,52)" fill="var(--clear-tint)"
+               stroke="var(--clear)" stroke-width="2"/>
+          <g fill="var(--clear)">
+            <circle cx="266" cy="52" r="3"/><circle cx="370" cy="42" r="3"/><circle cx="412" cy="78" r="3"/>
+            <circle cx="402" cy="136" r="3"/><circle cx="314" cy="150" r="3"/><circle cx="272" cy="106" r="3"/>
+          </g>
+          <text x="260" y="184" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" opacity=".78">6 vertices · 6 decimals each</text>
+          <text x="260" y="204" font-size="10.5" font-weight="600" fill="var(--clear)">Accepted</text>
+
+          <text x="230" y="228" font-family="IBM Plex Mono, monospace" font-size="10"
+                fill="currentColor" opacity=".6" text-anchor="middle">PLOT-019 · 7.4 ha · identical geometry, both panels</text>
+        </g>
+      </svg>
+      <figcaption>
+        One plot, declared two ways. Both panels draw the same boundary from a single definition. Only
+        the declaration differs, and only one of them can be filed.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="who">
+  <div class="shell">
+    <div class="head">
+      <div class="num">03</div>
+      <h2>Your origin country decides your obligation</h2>
+      <p>Not your own country. This is the point most operators get wrong, in both directions.</p>
+    </div>
+
+    <figure class="framed wide w900">
+      <svg viewBox="0 0 900 280" role="img"
+           aria-label="Decision tree: sourcing from a low-risk country waives risk assessment and mitigation, while standard or high risk keeps the full obligation. Both branches converge on the same requirement, because geolocation is owed under Article 9 in every tier.">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-family="Libre Franklin, sans-serif" fill="currentColor">
+          <rect x="10" y="112" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="24" y="136" font-size="12.5" font-weight="600">Where is it grown?</text>
+          <text x="24" y="154" font-size="10" opacity=".72">per plot, not per shipment</text>
+
+          <g stroke="currentColor" stroke-width="2" fill="none" marker-end="url(#ar2)">
+            <path d="M190,128 H256 V71 H314"/>
+            <path d="M190,152 H256 V211 H314"/>
+          </g>
+
+          <rect x="320" y="28" width="270" height="86" fill="var(--clear-tint)" stroke="var(--clear)" stroke-width="1.5"/>
+          <text x="336" y="50" font-size="9.5" font-weight="700" fill="#067A4E" letter-spacing=".8">LOW-RISK ORIGIN</text>
+          <text x="336" y="72" font-size="12.5" font-weight="600" fill="var(--clear)">Simplified due diligence</text>
+          <text x="336" y="90" font-size="10.5" opacity=".82">Art. 10 risk assessment: waived</text>
+          <text x="336" y="105" font-size="10.5" opacity=".82">Art. 11 mitigation: waived</text>
+
+          <rect x="320" y="166" width="270" height="90" fill="var(--critical-tint)" stroke="var(--critical)" stroke-width="1.5"/>
+          <text x="336" y="188" font-size="9.5" font-weight="700" fill="#C2560A" letter-spacing=".8">STANDARD OR HIGH-RISK ORIGIN</text>
+          <text x="336" y="210" font-size="12.5" font-weight="600" fill="var(--critical)">Full obligation</text>
+          <text x="336" y="228" font-size="10.5" opacity=".82">assessment and mitigation apply</text>
+          <text x="336" y="244" font-size="10" opacity=".82">Brazil, Indonesia, Peru, Côte d'Ivoire</text>
+
+          <g stroke="currentColor" stroke-width="2" fill="none" marker-end="url(#ar2)">
+            <path d="M590,71 H622 V128 H644"/>
+            <path d="M590,211 H622 V152 H644"/>
+          </g>
+
+          <rect x="650" y="98" width="240" height="84" fill="#067A4E"/>
+          <text x="666" y="126" fill="#FFFFFF" font-size="12.5" font-weight="600">Geolocation still required</text>
+          <text x="666" y="146" fill="#DFF4E9" font-size="10.5">Article 9 applies in every tier</text>
+          <text x="666" y="163" fill="#DFF4E9" font-size="10">polygons above 4 ha · 6 decimals</text>
+        </g>
+      </svg>
+      <figcaption>
+        Simplified due diligence gets read as an exemption. It is not one. Both branches land on the
+        same box, because the coordinates are owed wherever you buy from. What falls away is the
+        assessment sitting on top of them.
+      </figcaption>
+      <p class="scrollhint">Scroll the diagram sideways to see the full tree.</p>
+    </figure>
+
+    <div class="mesh two" style="margin-top:var(--s6)">
+      <div>
+        <h3 style="color:var(--clear);margin-bottom:var(--s3)">A fit</h3>
+        <ul style="margin:0;padding-left:var(--s5);font-size:var(--fs-sm);color:var(--ink-2);line-height:1.85">
+          <li>You are the operator, first placing goods on the EU market</li>
+          <li>Medium or large, so December 2026 applies</li>
+          <li>Coffee, cocoa, palm oil, soya or timber</li>
+          <li>Smallholder or cooperative supply, where data arrives fragmented</li>
+          <li>No geospatial function in-house</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:var(--critical);margin-bottom:var(--s3)">Not a fit</h3>
+        <ul style="margin:0;padding-left:var(--s5);font-size:var(--fs-sm);color:var(--ink-2);line-height:1.85">
+          <li>Cattle hides, leather and vulcanised rubber, all removed from Annex I in 2026</li>
+          <li>Organisations with an established GIS team</li>
+          <li>Anyone wanting software to run themselves. Good ones exist and we will name them</li>
+          <li>Anyone wanting a guarantee of deforestation-free, or their declaration filed for them. We do neither.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="check" class="tinted">
+  <div class="shell">
+    <div class="head">
+      <div class="num">04</div>
+      <h2>Check your own file</h2>
+      <p>These are the checks we run on day one of an engagement. It all happens in your browser, so nothing reaches us.</p>
+    </div>
+    <div class="diag">
+      <div class="diag-h">
+        <span class="label">Structural validation</span>
+        <span class="st" id="parsestat" role="status">example loaded</span>
+      </div>
+      <div class="diag-b">
+        <div class="pane">
+          <label for="inp" class="label" style="display:block;margin-bottom:var(--s2)">Input</label>
+          <textarea id="inp" spellcheck="false"></textarea>
+          <div class="acts">
+            <button class="btn sm" id="run" type="button">Run validation</button>
+            <button class="lnk" id="load" type="button">Restore example</button>
+            <button class="lnk" id="clear" type="button">Clear</button>
+          </div>
+          <p class="note" style="margin-top:var(--s2)">CSV or GeoJSON. Handles European semicolon exports and quoted fields.</p>
+        </div>
+        <div class="pane">
+          <span class="label" style="display:block;margin-bottom:var(--s2)">Findings</span>
+          <div id="out" role="region" aria-live="polite" aria-atomic="false" aria-label="Validation findings">
+            <div class="empty">Run the validation to see findings.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:var(--s3)">
+      A structural screen, not a compliance determination. It does not evaluate interior rings, and
+      does not test self-intersection above 2,000 positions. Where that limit is reached it says
+      so rather than passing the plot silently.
+    </p>
+  </div>
+</section>
+
+<section id="terms">
+  <div class="shell split">
+    <div>
+      <div class="head" style="margin-bottom:0">
+        <div class="num">05</div>
+        <h2>Data, and the question you were going to ask</h2>
+        <p>
+          Smallholder coordinates tied to named producers count as personal data, and we are based in
+          India, which has no EU adequacy decision. You were going to ask. Here is the answer.
+        </p>
+      </div>
+    </div>
+    <div class="framed">
+      <ul style="margin:0;padding-left:var(--s5);font-size:var(--fs-sm);color:var(--ink-2);line-height:1.9">
+        <li><strong>EU-hosted by default</strong>, so for EU clients the data never leaves the EU</li>
+        <li><strong>Processor under Article 28</strong>, on your DPA or on ours</li>
+        <li><strong>Standard Contractual Clauses</strong> where any transfer would occur</li>
+        <li><strong>No sub-processors</strong></li>
+        <li><strong>Deletion by default</strong>, thirty days after handover</li>
+        <li><strong>Your NDA first</strong>, before anything is sent</li>
+        <li><strong>Fixed fee</strong>, quoted before work starts. No day rates</li>
+        <li><strong>Free rework</strong> on any plot we certified clean that is later rejected for that defect</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="cta" id="cta">
+  <div class="shell split">
+    <div>
+      <div class="rule"></div>
+      <span class="label" style="display:block;margin-bottom:var(--s3)">Next step</span>
+      <h2>50 plots, 48 hours, no charge.</h2>
+      <p style="margin-top:var(--s4)">
+        Send a sample of real supplier data, the part you are least sure about. You get a written
+        report within 48 hours on which plots would pass and why. Nothing owed either way, and if the file is sound
+        we will tell you that.
+      </p>
+    </div>
+    <div class="box">
+      <dl style="margin:0 0 var(--s5)">
+        <div class="r"><dt>Quote turnaround</dt><dd>48 hours</dd></div>
+        <div class="r"><dt>Diagnostic</dt><dd>No charge</dd></div>
+        <div class="r"><dt>Basis</dt><dd>Fixed fee</dd></div>
+        <div class="r"><dt>Data location</dt><dd>EU-hosted</dd></div>
+      </dl>
+      <a class="btn" id="rfq" href="mailto:hardik@signalpoint.in?subject=EUDR%20plot%20data%20-%20request%20for%20quote">Request a quote</a>
+      <p style="margin-top:var(--s4)">
+        <span class="label" style="display:block;margin-bottom:var(--s1)">Direct</span>
+        <a class="m" href="mailto:hardik@signalpoint.in">hardik@signalpoint.in</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="shell">
+    <p><strong>SignalPoint</strong>. EUDR plot-data remediation, screening and evidence. We are a service practice. We do not certify, audit, or give legal advice.</p>
+    <p><a href="mailto:hardik@signalpoint.in">hardik@signalpoint.in</a> · Delhi, India</p>
+    <p class="src">
+      Regulation (EU) 2023/1115 as amended. Application dates and simplification: Regulation (EU)
+      2025/2650, OJ 23 December 2025, reconfirmed by the Commission's review of 4 May 2026.
+      Country classification: Implementing Regulation (EU) 2025/1093. Product scope: Delegated
+      Regulation (EU) 2026/2102. Aerial figures on this page are schematic illustrations, not
+      satellite captures of real holdings.
+    </p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var body=["Company:","Role:","","Commodity:","Sourcing origins:","Approximate plots:",
+            "Current format:","","Are you the operator placing goods on the EU market?  Yes / No / Unsure"].join("\n");
+  var l=document.getElementById("rfq");
+  if(l) l.href="mailto:hardik@signalpoint.in?subject="+encodeURIComponent("EUDR plot data - request for quote")+"&body="+encodeURIComponent(body);
+
+  var EXAMPLE=["plot_id,supplier,latitude,longitude,area_ha",
+    "ET-0417,\"Sidama Union, Ltd\",6.752341,38.471902,1.8",
+    "ET-0418,\"Sidama Union, Ltd\",6.75,38.47,2.1",
+    "ET-0419,\"Sidama Union, Ltd\",38.492117,6.766204,0.9",
+    "ET-0420,Yirga Coop,6.771244,38.488310,7.4",
+    "ET-0421,Yirga Coop,,38.491002,1.2",
+    "ET-0422,Yirga Coop,6.752341,38.471902,1.6",
+    "ET-0423,Guji Mill,0,0,3.3",
+    "ET-0424,Guji Mill,6.780100,38.452200,12.6",
+    "ET-0425,Guji Mill,6.788912,38.460551,2.2",
+    "ET-0425,Guji Mill,6.790015,38.462210,1.1",
+    "BR-1190,Cerrado Farms,-13.442017,-46.119284,84.0",
+    "BR-1191,Cerrado Farms,-13.451882,-46.130447,3.1",
+    "BR-1192,Cerrado Farms,-95.220188,-46.140119,2.7"].join("\n");
+
+  var inp=document.getElementById("inp"),out=document.getElementById("out"),stat=document.getElementById("parsestat");
+  function loadEx(){inp.value=EXAMPLE;stat.textContent="example loaded";
+    out.innerHTML='<div class="empty">Run the validation to see findings.</div>';}
+  loadEx();
+
+  function dec(s){var t=String(s).trim();if(/[eE]/.test(t))return null;var m=t.match(/\.(\d+)$/);return m?m[1].length:0;}
+  function isN(v){return v!==""&&v!==null&&v!==undefined&&isFinite(Number(v));}
+  function med(a){if(!a.length)return null;var b=a.slice().sort(function(x,y){return x-y;});var h=Math.floor(b.length/2);return b.length%2?b[h]:(b[h-1]+b[h])/2;}
+
+  function parseDelim(text){
+    var hd=text.split(/\r?\n/)[0]||"";
+    var c={",":(hd.match(/,/g)||[]).length,";":(hd.match(/;/g)||[]).length,"\t":(hd.match(/\t/g)||[]).length};
+    var d=",",best=-1,k;for(k in c){if(c[k]>best){best=c[k];d=k;}}
+    if(best<=0)return null;
+    var rows=[],cur=[],f="",q=false,i,ch,nx;
+    for(i=0;i<text.length;i++){ch=text[i];nx=text[i+1];
+      if(q){if(ch==='"'&&nx==='"'){f+='"';i++;}else if(ch==='"'){q=false;}else f+=ch;}
+      else if(ch==='"'){q=true;}
+      else if(ch===d){cur.push(f);f="";}
+      else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&nx==="\n")i++;cur.push(f);f="";
+        if(cur.length>1||cur[0]!=="")rows.push(cur);cur=[];}
+      else f+=ch;}
+    cur.push(f);if(cur.length>1||cur[0]!=="")rows.push(cur);
+    if(rows.length<2)return null;
+    var h2=rows[0].map(function(x){return x.trim().toLowerCase();});
+    function find(ex,lo){var i,j;
+      for(i=0;i<h2.length;i++)for(j=0;j<ex.length;j++)if(h2[i]===ex[j])return i;
+      if(lo)for(i=0;i<h2.length;i++)for(j=0;j<lo.length;j++)
+        if(new RegExp("(^|[_\\s-])"+lo[j]+"([_\\s-]|$)").test(h2[i]))return i;
+      return -1;}
+    var iLat=find(["latitude","lat","y"],["latitude","lat"]),
+        iLon=find(["longitude","lon","lng","long","x"],["longitude","lon","lng"]),
+        iId=find(["plot_id","plotid","id","plot"],["plot"]),
+        iA=find(["area_ha","area","hectares"],["ha","hectares","area"]);
+    if(iLat<0||iLon<0)return null;
+    var cd=(d===";");
+    function num(v){v=(v||"").trim();if(cd)v=v.replace(/\.(?=\d{3}\b)/g,"").replace(",",".");return v;}
+    var o=[];
+    for(var r=1;r<rows.length;r++){var c2=rows[r];
+      o.push({id:(iId>=0&&c2[iId])?c2[iId].trim():("row "+r),latRaw:num(c2[iLat]),lonRaw:num(c2[iLon]),
+        area:(iA>=0&&isN(num(c2[iA])))?Number(num(c2[iA])):null,geom:"point"});}
+    return o;}
+
+  function precIdx(t){var m={},re=/-?\d+\.\d+/g,x;
+    while((x=re.exec(t))!==null){var v=Number(x[0]),dd=dec(x[0]);if(!(v in m)||dd<m[v])m[v]=dd;}return m;}
+
+  function parseGJ(text){var g;try{g=JSON.parse(text);}catch(e){return null;}
+    var fe=g.type==="FeatureCollection"?g.features:(g.type==="Feature"?[g]:null);
+    if(!fe||!fe.length)return null;
+    var P=precIdx(text);function pd(v){return (v in P)?P[v]:dec(String(v));}
+    var rows=[];
+    for(var i=0;i<fe.length;i++){var f=fe[i]||{},p=f.properties||{},gm=f.geometry||{};
+      var id=p.plot_id||p.plotId||p.id||("feature "+(i+1));
+      var ar=isN(p.area_ha)?Number(p.area_ha):(isN(p.area)?Number(p.area):null);
+      var t=gm.type,co=gm.coordinates;
+      if(t==="Point"&&co)rows.push({id:id,geom:"point",lat:co[1],lon:co[0],latPrec:pd(co[1]),lonPrec:pd(co[0]),area:ar,parsed:true});
+      else if(t==="MultiPoint"&&co)for(var a=0;a<co.length;a++)
+        rows.push({id:id+" ["+(a+1)+"]",geom:"point",lat:co[a][1],lon:co[a][0],latPrec:pd(co[a][1]),lonPrec:pd(co[a][0]),area:ar,parsed:true});
+      else if(t==="Polygon"&&co&&co[0])rows.push({id:id,geom:"polygon",ring:co[0],holes:co.length-1,area:ar,prec:pd});
+      else if(t==="MultiPolygon"&&co)for(var b=0;b<co.length;b++)
+        if(co[b]&&co[b][0])rows.push({id:id+" ["+(b+1)+"]",geom:"polygon",ring:co[b][0],holes:co[b].length-1,area:ar,prec:pd});
+      else rows.push({id:id,geom:"unsupported",gtype:t||"missing"});}
+    return rows;}
+
+  function areaHa(r){if(!r||r.length<4)return 0;var s=0,i;for(i=0;i<r.length;i++)s+=r[i][1];
+    var l0=(s/r.length)*Math.PI/180,mLa=111132.92,mLo=111412.84*Math.cos(l0),a=0;
+    for(i=0;i<r.length-1;i++)a+=(r[i][0]*mLo)*(r[i+1][1]*mLa)-(r[i+1][0]*mLo)*(r[i][1]*mLa);
+    return Math.abs(a/2)/10000;}
+  function sArea(r){var a=0;for(var i=0;i<r.length-1;i++)a+=r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1];return a/2;}
+  function ori(a,b,c){var v=(b[1]-a[1])*(c[0]-b[0])-(b[0]-a[0])*(c[1]-b[1]);return v===0?0:(v>0?1:2);}
+  function onS(a,b,c){return b[0]<=Math.max(a[0],c[0])&&b[0]>=Math.min(a[0],c[0])&&b[1]<=Math.max(a[1],c[1])&&b[1]>=Math.min(a[1],c[1]);}
+  function sInt(p1,p2,p3,p4){var o1=ori(p1,p2,p3),o2=ori(p1,p2,p4),o3=ori(p3,p4,p1),o4=ori(p3,p4,p2);
+    if(o1!==o2&&o3!==o4)return true;
+    if(o1===0&&onS(p1,p3,p2))return true;if(o2===0&&onS(p1,p4,p2))return true;
+    if(o3===0&&onS(p3,p1,p4))return true;if(o4===0&&onS(p3,p2,p4))return true;return false;}
+  function selfInt(r){var n=r.length-1;if(n>2000)return null;
+    for(var i=0;i<n;i++)for(var j=i+2;j<n;j++){if(i===0&&j===n-1)continue;
+      if(sInt(r[i],r[i+1],r[j],r[j+1]))return true;}return false;}
+
+  function check(rows){
+    var F=[],sc={},si={},fi={},wi={};
+    function add(s,i,id,m){F.push({sev:s,id:id,msg:m});if(s==="FAIL")fi[i]=1;else wi[i]=1;}
+    var la=[],lo=[];
+    rows.forEach(function(r){var a=r.parsed?r.lat:Number(r.latRaw),b=r.parsed?r.lon:Number(r.lonRaw);
+      if(r.geom==="point"&&isFinite(a)&&isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180&&!(a===0&&b===0)){la.push(a);lo.push(b);}});
+    var mLa=med(la),mLo=med(lo);
+    function dist(a,b,c,d){return Math.sqrt((a-c)*(a-c)+(b-d)*(b-d));}
+
+    rows.forEach(function(r,ix){
+      if(r.id&&!/^(row|feature) \d+$/.test(r.id)){
+        if(si[r.id])add("FAIL",ix,r.id,"Duplicate plot identifier. Two records share this ID.");
+        else si[r.id]=1;}
+      if(r.geom==="unsupported"){add("WARN",ix,r.id,"Geometry type “"+r.gtype+"” is not evaluated by this screen.");return;}
+      if(r.geom==="polygon"){
+        var g=r.ring;
+        if(!g||g.length<4){add("FAIL",ix,r.id,"Polygon ring has fewer than four positions.");return;}
+        var f0=g[0],l0=g[g.length-1];
+        if(f0[0]!==l0[0]||f0[1]!==l0[1]){add("FAIL",ix,r.id,"Ring is not closed. The final position must repeat the first.");g=g.concat([f0]);}
+        if(g.some(function(c){return !isFinite(c[0])||!isFinite(c[1])||Math.abs(c[1])>90||Math.abs(c[0])>180;})){
+          add("FAIL",ix,r.id,"Polygon contains positions outside the valid coordinate range.");return;}
+        var w=6;for(var v=0;v<g.length;v++){var A=r.prec?r.prec(g[v][1]):6,B=r.prec?r.prec(g[v][0]):6;
+          if(A!==null&&A<w)w=A;if(B!==null&&B<w)w=B;}
+        if(w<6)add("WARN",ix,r.id,"Lowest vertex precision is "+w+" decimal place"+(w===1?"":"s")+"; six are required.");
+        var s=selfInt(g);
+        if(s===true)add("FAIL",ix,r.id,"Polygon boundary crosses itself.");
+        else if(s===null)add("WARN",ix,r.id,"Ring has "+(g.length-1)+" segments, above this screen's limit, so self-intersection was not evaluated.");
+        if(sArea(g)<0)add("WARN",ix,r.id,"Exterior ring wound clockwise; RFC 7946 expects counter-clockwise.");
+        if(r.holes>0)add("WARN",ix,r.id,"Polygon has "+r.holes+" interior ring"+(r.holes===1?"":"s")+", not evaluated here.");
+        var ha=areaHa(g);
+        if(ha>0&&ha<0.01)add("WARN",ix,r.id,"Encloses under 0.01 ha, so check somebody walked the boundary instead of tapping the screen.");
+        if(r.area!==null&&ha>0&&Math.abs(ha-r.area)/Math.max(ha,r.area)>0.25)
+          add("WARN",ix,r.id,"Declared "+r.area+" ha differs materially from the "+(+ha.toFixed(2))+" ha enclosed.");
+        return;}
+      var lat,lon,dLa,dLo;
+      if(r.parsed){lat=r.lat;lon=r.lon;dLa=r.latPrec;dLo=r.lonPrec;}
+      else{if(!isN(r.latRaw)||!isN(r.lonRaw)){add("FAIL",ix,r.id,"Missing or non-numeric coordinates.");return;}
+        lat=Number(r.latRaw);lon=Number(r.lonRaw);dLa=dec(r.latRaw);dLo=dec(r.lonRaw);}
+      if(!isFinite(lat)||!isFinite(lon)){add("FAIL",ix,r.id,"Missing or non-numeric coordinates.");return;}
+      var bad=false;
+      if(Math.abs(lat)>90){add("FAIL",ix,r.id,"Latitude "+lat+" is outside −90 to 90.");bad=true;}
+      if(Math.abs(lon)>180){add("FAIL",ix,r.id,"Longitude "+lon+" is outside −180 to 180.");bad=true;}
+      if(lat===0&&lon===0){add("FAIL",ix,r.id,"Coordinates are 0,0, which means a null value, not a reading.");bad=true;}
+      if(bad)return;
+      if(mLa!==null&&mLo!==null&&Math.abs(lon)<=90){
+        var d0=dist(lat,lon,mLa,mLo),d1=dist(lon,lat,mLa,mLo);
+        if(d0>1&&d1<d0*0.1)add("FAIL",ix,r.id,"Latitude and longitude appear transposed. Swapping them places this plot with the rest of the file.");}
+      var dm=Math.min(dLa===null?6:dLa,dLo===null?6:dLo);
+      if(dm<6)add("WARN",ix,r.id,dm<=2?("Only "+dm+" decimal place"+(dm===1?"":"s")+", resolving to roughly a kilometre, so it points at a district, not a plot."):("Carries "+dm+" decimal places; six are required."));
+      var k=lat.toFixed(6)+","+lon.toFixed(6);
+      if(sc[k])add("WARN",ix,r.id,"Coordinates identical to "+sc[k]+", so either a duplicate or two plots logged at one collection point.");
+      else sc[k]=r.id;
+      if(r.area!==null&&r.area>4)
+        add("FAIL",ix,r.id,"Declared area of "+r.area+" ha exceeds 4 ha, so a boundary polygon is required; a point will not satisfy it.");
+    });
+    var ord={FAIL:0,WARN:1};F.sort(function(a,b){return ord[a.sev]-ord[b.sev];});
+    return {findings:F,fail:Object.keys(fi).length,
+      warn:Object.keys(wi).filter(function(k){return !fi[k];}).length,total:rows.length};}
+
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];});}
+
+  function render(R){
+    var cl=R.total-R.fail-R.warn,h="";
+    if(R.fail>0)h+='<div class="verdict bad"><div class="b">'+R.fail+" of "+R.total+' plots carry blocking defects.</div><div class="s">Each needs a correction, or a specific request back to the supplier.</div></div>';
+    else if(R.warn>0)h+='<div class="verdict"><div class="b">No blocking defects; '+R.warn+" to review.</div><div class=\"s\">None will stop a declaration, but each warrants a look.</div></div>";
+    else h+='<div class="verdict good"><div class="b">All '+R.total+' plots pass.</div><div class="s">Structurally sound. This says nothing about deforestation risk.</div></div>';
+    h+='<div class="tally"><span class="pill f">'+R.fail+' blocking</span><span class="pill w">'+R.warn+' to review</span><span class="pill p">'+cl+' clean</span></div>';
+    if(R.findings.length){h+='<div class="finds" tabindex="0" role="group" aria-label="Findings">';
+      R.findings.slice(0,250).forEach(function(f){
+        h+='<div class="find"><span class="sev '+(f.sev==="FAIL"?"FAIL":"WARN")+'">'+f.sev+'</span><span><span class="id">'+esc(f.id)+"</span> &middot; "+esc(f.msg)+"</span></div>";});
+      if(R.findings.length>250)h+='<div class="find"><span>'+(R.findings.length-250)+" further findings not shown.</span></div>";
+      h+="</div>";}
+    if(R.fail>0||R.warn>0)h+='<p class="note" style="margin-top:var(--s3)">Most are fixable without returning to the supplier. <a href="#cta">Request a quote</a> for the corrected dataset and an exception register.</p>';
+    out.innerHTML=h;}
+
+  document.getElementById("run").addEventListener("click",function(){
+    var t=inp.value.trim();
+    if(!t){out.innerHTML='<div class="empty">Paste a CSV or GeoJSON, then run the validation.</div>';stat.textContent="no data";return;}
+    var rows=null,kind="";
+    if(t.charAt(0)==="{"||t.charAt(0)==="["){rows=parseGJ(t);kind="GeoJSON";}
+    if(!rows){rows=parseDelim(t);kind="delimited";}
+    if(!rows||!rows.length){out.innerHTML='<div class="empty">Unable to read that. Delimited text needs latitude and longitude columns; GeoJSON needs a Feature or FeatureCollection.</div>';stat.textContent="unreadable";return;}
+    stat.textContent=kind+" · "+rows.length+" record"+(rows.length===1?"":"s");
+    render(check(rows));});
+  var mnu=document.querySelector(".menu");
+  if(mnu) mnu.addEventListener("click",function(e){
+    if(e.target.tagName==="A") mnu.removeAttribute("open");
+  });
+
+  document.getElementById("load").addEventListener("click",loadEx);
+  document.getElementById("clear").addEventListener("click",function(){
+    inp.value="";stat.textContent="no data";
+    out.innerHTML='<div class="empty">Paste a CSV or GeoJSON, then run the validation.</div>';inp.focus();});
+})();
+</script>
+
+</body>
+</html>
