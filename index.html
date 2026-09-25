@@ -223,6 +223,30 @@
   .cta a.m{color:var(--on-invert);font-family:var(--mono);font-size:var(--fs-sm);word-break:break-all}
   .copied{margin-top:var(--s3);font-family:var(--mono);font-size:var(--fs-xs);
           color:var(--on-invert);opacity:.9}
+  form.rq{display:grid;gap:var(--s3)}
+  form.rq label{font-size:var(--fs-xs);font-weight:600;letter-spacing:.14em;
+                text-transform:uppercase;color:color-mix(in srgb,var(--on-invert) 66%,transparent)}
+  form.rq input,form.rq select{width:100%;font:inherit;font-size:var(--fs-sm);
+    padding:var(--s3);border:1px solid color-mix(in srgb,var(--on-invert) 34%,transparent);
+    background:color-mix(in srgb,var(--on-invert) 7%,transparent);color:var(--on-invert);border-radius:0}
+  form.rq input::placeholder{color:color-mix(in srgb,var(--on-invert) 44%,transparent)}
+  form.rq input:focus-visible,form.rq select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  form.rq option{color:#0C1711}
+  form.rq .row2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+  @media(max-width:560px){form.rq .row2{grid-template-columns:1fr}}
+  form.rq button{margin-top:var(--s2)}
+  .formnote{font-size:var(--fs-xs);color:color-mix(in srgb,var(--on-invert) 62%,transparent)}
+  .sent{border-left:3px solid var(--accent);padding:var(--s4);
+        background:color-mix(in srgb,var(--on-invert) 8%,transparent)}
+  .sent b{display:block;font-family:var(--serif);font-size:var(--fs-lg);margin-bottom:var(--s2)}
+  /* the in-diagnostic capture, shown only once a check has run */
+  .grab{margin-top:var(--s4);border:1px solid var(--line-strong);background:var(--ground);
+        padding:var(--s4)}
+  .grab p{font-size:var(--fs-sm);color:var(--ink-2);margin-bottom:var(--s3)}
+  .grab .g2{display:flex;gap:var(--s2);flex-wrap:wrap}
+  .grab input{flex:1 1 200px;font:inherit;font-size:var(--fs-sm);padding:var(--s2) var(--s3);
+              border:1px solid var(--line-strong);background:var(--ground-2);color:var(--ink);border-radius:0}
+  .grab .ok{font-size:var(--fs-sm);color:var(--clear);font-weight:600}
   .box{border:1px solid color-mix(in srgb,var(--on-invert) 30%,transparent);padding:var(--s5)}
   .box .r{display:flex;justify-content:space-between;gap:var(--s4);padding-block:var(--s2);
           border-bottom:1px solid color-mix(in srgb,var(--on-invert) 18%,transparent)}
@@ -678,12 +702,39 @@
         <div class="r"><dt>Basis</dt><dd>Fixed fee</dd></div>
         <div class="r"><dt>Data location</dt><dd>EU-hosted</dd></div>
       </dl>
-      <a class="btn" id="rfq" href="mailto:hardik@signalpoint.in?subject=EUDR%20plot%20data%20-%20request%20for%20quote">Request a quote</a>
-      <p class="copied" id="rfqmsg" hidden></p>
-      <p style="margin-top:var(--s4)">
-        <span class="label" style="display:block;margin-bottom:var(--s1)">Or write to us directly</span>
-        <a class="m" href="mailto:hardik@signalpoint.in">hardik@signalpoint.in</a>
-      </p>
+      <form class="rq" id="rqform">
+        <div>
+          <label for="f-email">Your work email</label>
+          <input id="f-email" name="email" type="email" required placeholder="name@company.com" autocomplete="email">
+        </div>
+        <div class="row2">
+          <div>
+            <label for="f-co">Company</label>
+            <input id="f-co" name="company" type="text" required placeholder="Company name" autocomplete="organization">
+          </div>
+          <div>
+            <label for="f-plots">Roughly how many plots</label>
+            <select id="f-plots" name="plots">
+              <option>Not sure yet</option>
+              <option>Under 500</option>
+              <option>500 to 2,000</option>
+              <option>2,000 to 10,000</option>
+              <option>Over 10,000</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="f-origins">Sourcing origins</label>
+          <input id="f-origins" name="origins" type="text" placeholder="Colombia, Peru, Ethiopia">
+        </div>
+        <button class="btn" type="submit" id="f-submit">Request a quote</button>
+        <p class="formnote" id="f-note">We reply within 48 hours with a fixed fee and a delivery date. No newsletter, no follow-up sequence.</p>
+      </form>
+      <div class="sent" id="rqsent" hidden>
+        <b>Thanks, that is with us.</b>
+        <p style="font-size:var(--fs-sm)">You will have a reply within 48 hours. If it is urgent, write straight to
+        <a class="m" href="mailto:hardik@signalpoint.in">hardik@signalpoint.in</a>.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -708,25 +759,50 @@
 (function(){
   "use strict";
   var ADDR="hardik@signalpoint.in";
+
+  // Form delivery. Web3Forms relays a POST to our inbox with no backend of our own.
+  // Replace ACCESS_KEY with the key from web3forms.com (free, no account, arrives by
+  // email in under a minute). Until then the forms fall back to a mailto.
+  var ACCESS_KEY="REPLACE_WITH_WEB3FORMS_ACCESS_KEY";
+
+  function post(fields, ok, fail){
+    if(ACCESS_KEY.indexOf("REPLACE_WITH")===0){ mailtoFallback(fields); ok(); return; }
+    var payload=Object.assign({access_key:ACCESS_KEY,from_name:"SignalPoint site"},fields);
+    fetch("https://api.web3forms.com/submit",{
+      method:"POST",
+      headers:{"Content-Type":"application/json",Accept:"application/json"},
+      body:JSON.stringify(payload)
+    }).then(function(r){ return r.json(); })
+      .then(function(d){ d && d.success ? ok() : fail(); })
+      .catch(fail);
+  }
+
+  function mailtoFallback(f){
+    var lines=[];
+    for(var k in f){ if(Object.prototype.hasOwnProperty.call(f,k)) lines.push(k+": "+f[k]); }
+    window.location.href="mailto:"+ADDR+"?subject="+encodeURIComponent("EUDR plot data enquiry")
+      +"&body="+encodeURIComponent(lines.join("\n"));
+  }
   var body=["Company:","Role:","","Commodity:","Sourcing origins:","Approximate plots:",
             "Current format:","","Are you the operator placing goods on the EU market?  Yes / No / Unsure"].join("\n");
-  var l=document.getElementById("rfq"), msg=document.getElementById("rfqmsg");
-  if(l){
-    l.href="mailto:"+ADDR+"?subject="+encodeURIComponent("EUDR plot data - request for quote")
-           +"&body="+encodeURIComponent(body);
-    // A mailto: does nothing on a machine with no mail handler registered, which is
-    // common on desktop. Copy the address as well, and say so, so the click always
-    // leaves the visitor with something usable.
-    l.addEventListener("click",function(){
-      function tell(t){ if(msg){ msg.textContent=t; msg.hidden=false; } }
-      try{
-        if(navigator.clipboard && navigator.clipboard.writeText){
-          navigator.clipboard.writeText(ADDR).then(
-            function(){ tell("Address copied: "+ADDR); },
-            function(){ tell("Write to "+ADDR); }
-          );
-        } else { tell("Write to "+ADDR); }
-      }catch(e){ tell("Write to "+ADDR); }
+  var rq=document.getElementById("rqform");
+  if(rq){
+    rq.addEventListener("submit",function(ev){
+      ev.preventDefault();
+      var btn=document.getElementById("f-submit");
+      btn.disabled=true; btn.textContent="Sending";
+      post({
+        email:    document.getElementById("f-email").value.trim(),
+        company:  document.getElementById("f-co").value.trim(),
+        plots:    document.getElementById("f-plots").value,
+        origins:  document.getElementById("f-origins").value.trim(),
+        subject:  "Quote request from the site",
+        source:   "request a quote form"
+      },
+      function(){ rq.hidden=true; document.getElementById("rqsent").hidden=false; },
+      function(){ btn.disabled=false; btn.textContent="Request a quote";
+                  document.getElementById("f-note").textContent=
+                    "That did not send. Write to hardik@signalpoint.in and we will pick it up."; });
     });
   }
 
@@ -897,8 +973,33 @@
         h+='<div class="find"><span class="sev '+(f.sev==="FAIL"?"FAIL":"WARN")+'">'+f.sev+'</span><span><span class="id">'+esc(f.id)+"</span> &middot; "+esc(f.msg)+"</span></div>";});
       if(R.findings.length>250)h+='<div class="find"><span>'+(R.findings.length-250)+" further findings not shown.</span></div>";
       h+="</div>";}
-    if(R.fail>0||R.warn>0)h+='<p class="note" style="margin-top:var(--s3)">Most are fixable without returning to the supplier. <a href="#cta">Request a quote</a> for the corrected dataset and an exception register.</p>';
-    out.innerHTML=h;}
+    if(R.fail>0||R.warn>0){
+      h+='<div class="grab"><p><strong>Want this as a written report?</strong> Send it to yourself, '
+       + 'with every finding listed and what to do about each one. No charge, and we do not add you to anything.</p>'
+       + '<form class="g2" id="grabform"><input id="grab-email" type="email" required '
+       + 'placeholder="you@company.com" aria-label="Your email"><button class="btn sm" type="submit">Email me the report</button></form>'
+       + '<p class="ok" id="grab-ok" hidden>On its way.</p></div>';
+    }
+    out.innerHTML=h;
+    wireGrab(R);}
+
+  // The results panel is the highest-intent moment on the page, so it gets its own
+  // capture. Sends the counts, not the plot data, which never leaves the browser.
+  function wireGrab(R){
+    var f=document.getElementById("grabform");
+    if(!f) return;
+    f.addEventListener("submit",function(ev){
+      ev.preventDefault();
+      var em=document.getElementById("grab-email").value.trim();
+      if(!em) return;
+      post({email:em,subject:"Diagnostic report request",
+            summary:R.fail+" blocking, "+R.warn+" to review, "+(R.total-R.fail-R.warn)+" clean, of "+R.total+" plots",
+            source:"in-page diagnostic"},
+        function(){ f.hidden=true; document.getElementById("grab-ok").hidden=false; },
+        function(){ f.hidden=true; var o=document.getElementById("grab-ok");
+                    o.textContent="Could not send. Write to hardik@signalpoint.in and we will run it."; o.hidden=false; });
+    });
+  }
 
   document.getElementById("run").addEventListener("click",function(){
     var t=inp.value.trim();
