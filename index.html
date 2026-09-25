@@ -221,6 +221,8 @@
   .cta .rule{background:var(--accent)}
   .cta .btn{background:var(--on-invert);border-color:var(--on-invert);color:var(--invert)}
   .cta a.m{color:var(--on-invert);font-family:var(--mono);font-size:var(--fs-sm);word-break:break-all}
+  .copied{margin-top:var(--s3);font-family:var(--mono);font-size:var(--fs-xs);
+          color:var(--on-invert);opacity:.9}
   .box{border:1px solid color-mix(in srgb,var(--on-invert) 30%,transparent);padding:var(--s5)}
   .box .r{display:flex;justify-content:space-between;gap:var(--s4);padding-block:var(--s2);
           border-bottom:1px solid color-mix(in srgb,var(--on-invert) 18%,transparent)}
@@ -677,8 +679,9 @@
         <div class="r"><dt>Data location</dt><dd>EU-hosted</dd></div>
       </dl>
       <a class="btn" id="rfq" href="mailto:hardik@signalpoint.in?subject=EUDR%20plot%20data%20-%20request%20for%20quote">Request a quote</a>
+      <p class="copied" id="rfqmsg" hidden></p>
       <p style="margin-top:var(--s4)">
-        <span class="label" style="display:block;margin-bottom:var(--s1)">Direct</span>
+        <span class="label" style="display:block;margin-bottom:var(--s1)">Or write to us directly</span>
         <a class="m" href="mailto:hardik@signalpoint.in">hardik@signalpoint.in</a>
       </p>
     </div>
@@ -704,10 +707,28 @@
 <script>
 (function(){
   "use strict";
+  var ADDR="hardik@signalpoint.in";
   var body=["Company:","Role:","","Commodity:","Sourcing origins:","Approximate plots:",
             "Current format:","","Are you the operator placing goods on the EU market?  Yes / No / Unsure"].join("\n");
-  var l=document.getElementById("rfq");
-  if(l) l.href="mailto:hardik@signalpoint.in?subject="+encodeURIComponent("EUDR plot data - request for quote")+"&body="+encodeURIComponent(body);
+  var l=document.getElementById("rfq"), msg=document.getElementById("rfqmsg");
+  if(l){
+    l.href="mailto:"+ADDR+"?subject="+encodeURIComponent("EUDR plot data - request for quote")
+           +"&body="+encodeURIComponent(body);
+    // A mailto: does nothing on a machine with no mail handler registered, which is
+    // common on desktop. Copy the address as well, and say so, so the click always
+    // leaves the visitor with something usable.
+    l.addEventListener("click",function(){
+      function tell(t){ if(msg){ msg.textContent=t; msg.hidden=false; } }
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(ADDR).then(
+            function(){ tell("Address copied: "+ADDR); },
+            function(){ tell("Write to "+ADDR); }
+          );
+        } else { tell("Write to "+ADDR); }
+      }catch(e){ tell("Write to "+ADDR); }
+    });
+  }
 
   var EXAMPLE=["plot_id,supplier,latitude,longitude,area_ha",
     "ET-0417,\"Sidama Union, Ltd\",6.752341,38.471902,1.8",
